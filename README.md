@@ -23,7 +23,8 @@ claude plugin marketplace add SensoryDeprivation/AI.Skills
 
 | Skill | Description |
 |-------|-------------|
-| *(coming soon)* | |
+| `/AdamJ:secrets-check` | Scan modified files for API keys, tokens, and certificates before committing |
+| `/AdamJ:commit-safe` | Stage, commit, and push — runs secrets scan first, aborts if anything is found |
 
 ## License
 

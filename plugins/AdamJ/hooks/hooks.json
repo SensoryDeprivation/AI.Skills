@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git rev-parse --git-dir > /dev/null 2>&1 && [ -n \"$(git status --porcelain)\" ]; then echo \"Uncommitted changes detected in this repository. Ask the user: 'Would you like me to commit and push your changes? I'll run a secrets scan first.'\"; exit 2; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
