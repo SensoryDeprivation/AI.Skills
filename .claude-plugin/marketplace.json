@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "AI.Skills",
+  "description": "AdamJ's personal Claude Code skill library",
+  "owner": {
+    "name": "Adam Jaszczurowski",
+    "email": "adam.jaszczurowski@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "AdamJ",
+      "description": "Personal Claude Code skills by AdamJ",
+      "author": {
+        "name": "Adam Jaszczurowski",
+        "url": "https://github.com/SensoryDeprivation"
+      },
+      "category": "productivity",
+      "source": "./plugins/AdamJ",
+      "homepage": "https://github.com/SensoryDeprivation/AI.Skills"
+    }
+  ]
+}
