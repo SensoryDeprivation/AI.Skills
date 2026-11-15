@@ -28,7 +28,7 @@ claude plugin marketplace add SensoryDeprivation/AI.Skills
 
 ## Stepflow (separate plugin)
 
-Install on its own, without the skills above:
+Install on its own, without the skills above (details in [plugins/stepflow/README.md](plugins/stepflow/README.md)):
 ```
 /plugin install stepflow@AI.Skills
 ```

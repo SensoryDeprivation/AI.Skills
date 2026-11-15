@@ -2,7 +2,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runClaude } from '../scripts/claude.mjs';
 
@@ -104,7 +104,7 @@ test('windows: resolves the real binary behind npm\'s claude.cmd shim', async ()
   assert.deepEqual(resolveClaude(js.dir, 'win32'), [process.execPath, [join(js.pkg, 'cli.js')]]);
   const native = mkdtempSync(join(tmpdir(), 'stepflow-native-'));
   writeFileSync(join(native, 'claude.exe'), '');
-  assert.deepEqual(resolveClaude([native, exe.dir].join(';'), 'win32'), [join(native, 'claude.exe'), []]);
+  assert.deepEqual(resolveClaude([native, exe.dir].join(delimiter), 'win32'), [join(native, 'claude.exe'), []]);
   assert.deepEqual(resolveClaude(exe.dir, 'linux'), ['claude', []]);
 });
 

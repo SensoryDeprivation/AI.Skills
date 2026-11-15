@@ -31,7 +31,8 @@ function killTree(child) {
   if (process.platform === 'win32' && child.pid) {
     spawn('taskkill', ['/T', '/F', '/PID', String(child.pid)], { windowsHide: true, stdio: 'ignore' }).on('error', () => child.kill());
   } else {
-    child.kill('SIGKILL');
+    // The child leads its own process group (detached), so this reaches its tool subprocesses too.
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
   }
 }
 
@@ -47,7 +48,7 @@ export function runClaude({ message, cwd, sessionId, isFirst, contextFile, allow
   return new Promise(resolve => {
     let stdout = '', stderr = '', settled = false, timedOut = false;
     const done = result => { if (!settled) { settled = true; clearTimeout(timer); resolve({ sessionId, denials: [], text: '', ...result }); } };
-    const child = spawn(bin, args, { cwd, windowsHide: true });
+    const child = spawn(bin, args, { cwd, windowsHide: true, detached: process.platform !== 'win32' });
     // On timeout kill the whole tree (tool subprocesses too); resolve once the process has exited.
     const timer = setTimeout(() => { timedOut = true; killTree(child); }, timeoutMs);
     child.stdout.on('data', d => (stdout += d));
