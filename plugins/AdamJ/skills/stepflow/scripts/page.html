@@ -6,13 +6,15 @@
 <title>Stepflow</title>
 <style>
   :root {
-    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --border: #dddcd6;
-    --accent: #2f6fdf; --done: #2e8b57; --blocked: #c2410c; --skipped: #8a8a85; --code: #f0efea; --error: #b91c1c;
+    --bg: #f2f6f3; --card: #ffffff; --text: #16201b; --muted: #5b6b63; --border: #d3ddd7;
+    --accent: #0b6b4f; --on-accent: #ffffff; --accent-soft: #dfeee7; --done: #0b6b4f; --blocked: #c2410c;
+    --skipped: #8a948f; --code: #e9f0ec; --error: #b91c1c;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #161615; --card: #20201e; --text: #ecebe6; --muted: #9b9a94; --border: #34332f;
-      --accent: #6c9cf0; --done: #4fb07a; --blocked: #f08a4b; --skipped: #77766f; --code: #2a2a27; --error: #f87171;
+      --bg: #0e1512; --card: #15201b; --text: #e4ede8; --muted: #92a39a; --border: #283731;
+      --accent: #3fae86; --on-accent: #04130d; --accent-soft: #1a382d; --done: #3fae86; --blocked: #f08a4b;
+      --skipped: #74827b; --code: #1c2a24; --error: #f87171;
     }
   }
   * { box-sizing: border-box; }
@@ -26,7 +28,7 @@
   .head { all: unset; box-sizing: border-box; display: flex; gap: 12px; align-items: center; width: 100%; padding: 12px 16px; cursor: pointer; }
   .head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; border: 1.5px solid var(--border); flex: none; }
-  .step[data-status=done] .num { background: var(--done); border-color: var(--done); color: #fff; }
+  .step[data-status=done] .num { background: var(--done); border-color: var(--done); color: var(--on-accent); }
   .step[data-status=blocked] .num { background: var(--blocked); border-color: var(--blocked); color: #fff; }
   .step[data-status=skipped] .num { color: var(--skipped); border-style: dashed; }
   .title { flex: 1; font-weight: 600; }
@@ -43,7 +45,12 @@
   button { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 7px; padding: 6px 12px; cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); }
   button:disabled { opacity: .5; cursor: default; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button.spinoff { margin-left: auto; display: inline-flex; gap: 8px; align-items: center; padding: 6px 14px 6px 12px; border: 1.5px solid var(--accent); border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  button.spinoff svg { width: 16px; height: 16px; }
+  button.spinoff .count { background: var(--accent); color: var(--on-accent); border-radius: 999px; font-size: 12px; padding: 0 7px; line-height: 18px; }
+  button.spinoff.on { background: var(--accent); color: var(--on-accent); }
+  button.spinoff.on .count { background: var(--on-accent); color: var(--accent); }
   button.warn { color: var(--blocked); }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .panel { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
@@ -209,7 +216,10 @@ function stepHtml(s, i) {
         <button class="warn" data-act="status" data-status="blocked" data-id="${esc(s.id)}" ${off}>Blocked</button>
         <button data-act="status" data-status="skipped" data-id="${esc(s.id)}" ${off}>Skip</button>
         ${s.status !== 'pending' ? `<button data-act="status" data-status="pending" data-id="${esc(s.id)}" ${off}>Reset</button>` : ''}
-        <button class="${state.panel === s.id ? 'on' : ''}" data-act="chat" data-id="${esc(s.id)}" aria-pressed="${state.panel === s.id}">Spin-off${s.messages.length ? ` (${s.messages.length})` : ''} →</button>
+        <button class="spinoff ${state.panel === s.id ? 'on' : ''}" data-act="chat" data-id="${esc(s.id)}" aria-pressed="${state.panel === s.id}" title="Troubleshoot this step with Claude in a side panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+          Spin-off${s.messages.length ? `<span class="count">${s.messages.length}</span>` : ''}
+        </button>
       </div>
       <div class="panel">
         <h3>Lesson for next time</h3>
