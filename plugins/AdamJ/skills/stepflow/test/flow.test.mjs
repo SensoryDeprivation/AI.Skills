@@ -128,3 +128,11 @@ test('loadFlow accepts a UTF-8 BOM', () => {
   writeFileSync(path, '﻿' + JSON.stringify(sample()));
   assert.equal(loadFlow(path).steps.length, 3);
 });
+
+test('expected result goes into context prompt and runbook', () => {
+  const flow = sample();
+  flow.steps[1].expected = 'Demo toggle shows **On**';
+  normalize(flow);
+  assert.match(contextPrompt(flow, 's2'), /Expected result:\n\nDemo toggle shows \*\*On\*\*/);
+  assert.match(renderRunbook(flow), /## 2\. Configure — pending\n\nEdit config\n\n\*\*Expected:\*\* Demo toggle shows \*\*On\*\*/);
+});

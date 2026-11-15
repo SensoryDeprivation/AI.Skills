@@ -23,12 +23,17 @@ Write `~/.stepflow/<yyyy-mm-dd>-<short-slug>/flow.json` (on Windows `~` is `$env
   "context": "OS, shell, versions, constraints the spin-off should know",
   "cwd": "C:\\path\\the\\spin-off\\should\\run\\in",
   "steps": [
-    { "title": "Short imperative title", "body": "Markdown. Commands in fenced blocks with a language tag." }
+    {
+      "title": "Short imperative title",
+      "body": "Markdown. Commands in fenced blocks with a language tag.",
+      "expected": "Markdown. What the user should see if the step worked (output, file, UI state)."
+    }
   ]
 }
 ```
 
-- One action per step, so Done/Blocked is meaningful. Include how to tell the step worked.
+- One action per step, so Done/Blocked is meaningful.
+- Always fill `expected` with what success looks like: the output to expect (in a fenced block if it's literal output), the file that should exist, or the UI state. The page shows it right under the command; keep it out of `body`.
 - Every command goes in a fenced block (the page adds a Copy button). Click-through steps name the exact menu path.
 - `cwd`: the project directory if the procedure is about one, otherwise the user's home.
 - Leave out `id`, `status`, `token`, `port` — the server fills them in.

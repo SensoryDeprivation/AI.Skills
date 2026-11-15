@@ -82,6 +82,8 @@ export function contextPrompt(flow, stepId) {
     `You are helping the user with step ${index + 1}: ${step.title}`,
     'Step instructions:',
     step.body ?? '',
+    step.expected ? 'Expected result:' : '',
+    step.expected ?? '',
   ].filter(Boolean).join('\n\n');
 }
 
@@ -94,6 +96,7 @@ export function renderRunbook(flow) {
   if (flow.context) parts.push(`**Context:** ${flow.context}`);
   flow.steps.forEach((s, i) => {
     parts.push(`## ${i + 1}. ${s.title} — ${s.status}`, s.body ?? '');
+    if (s.expected) parts.push(`**Expected:** ${s.expected}`);
     if (s.lesson) parts.push(`> Lesson: ${s.lesson}`);
   });
   const attention = flow.steps
