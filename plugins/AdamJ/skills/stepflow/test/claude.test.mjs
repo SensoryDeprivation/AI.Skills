@@ -85,3 +85,43 @@ test('timeout kills the whole process tree', async () => {
   await new Promise(res => setTimeout(res, 2000));
   assert.equal(existsSync(mark), false, 'grandchild survived the timeout');
 });
+
+test('windows: resolves the real binary behind npm\'s claude.cmd shim', async () => {
+  const { resolveClaude } = await import('../scripts/claude.mjs');
+  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const npmLayout = bin => {
+    const dir = mkdtempSync(join(tmpdir(), 'stepflow-npm-'));
+    const pkg = join(dir, 'node_modules', '@anthropic-ai', 'claude-code');
+    mkdirSync(join(pkg, 'bin'), { recursive: true });
+    writeFileSync(join(dir, 'claude.cmd'), '@echo off');
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify({ bin }));
+    writeFileSync(join(pkg, typeof bin === 'string' ? bin : bin.claude), '');
+    return { dir, pkg };
+  };
+  const exe = npmLayout({ claude: 'bin/claude.exe' });
+  assert.deepEqual(resolveClaude(exe.dir, 'win32'), [join(exe.pkg, 'bin', 'claude.exe'), []]);
+  const js = npmLayout({ claude: 'cli.js' });
+  assert.deepEqual(resolveClaude(js.dir, 'win32'), [process.execPath, [join(js.pkg, 'cli.js')]]);
+  const native = mkdtempSync(join(tmpdir(), 'stepflow-native-'));
+  writeFileSync(join(native, 'claude.exe'), '');
+  assert.deepEqual(resolveClaude([native, exe.dir].join(';'), 'win32'), [join(native, 'claude.exe'), []]);
+  assert.deepEqual(resolveClaude(exe.dir, 'linux'), ['claude', []]);
+});
+
+test('windows: a cli.js-backed npm install actually runs', { skip: process.platform !== 'win32' }, async () => {
+  const { writeFileSync, mkdirSync, copyFileSync } = await import('node:fs');
+  const dir = mkdtempSync(join(tmpdir(), 'stepflow-npm-'));
+  const pkg = join(dir, 'node_modules', '@anthropic-ai', 'claude-code');
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(join(dir, 'claude.cmd'), '@echo off');
+  writeFileSync(join(pkg, 'package.json'), JSON.stringify({ bin: { claude: 'cli.mjs' } }));
+  copyFileSync(fake, join(pkg, 'cli.mjs'));
+  delete process.env.STEPFLOW_CLAUDE;
+  const path = process.env.PATH;
+  process.env.PATH = dir;
+  try {
+    const r = await runClaude({ ...base, isFirst: true, contextFile: 'ctx.md' });
+    assert.equal(r.error, undefined);
+    assert.equal(r.text, 'echo: hi');
+  } finally { process.env.PATH = path; }
+});
