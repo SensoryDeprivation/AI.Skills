@@ -66,10 +66,25 @@
   dialog { max-width: 760px; width: calc(100% - 32px); background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 10px; }
   dialog pre { max-height: 60vh; overflow: auto; background: var(--code); padding: 12px; border-radius: 8px; white-space: pre-wrap; }
   .banner { padding: 10px 14px; border-radius: 8px; background: var(--code); margin-bottom: 16px; }
+  :root { --side-w: min(520px, 46vw); --foot-h: 53px; }
+  aside { position: fixed; top: 0; right: 0; bottom: var(--foot-h); width: var(--side-w); background: var(--card); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 5; }
+  aside[hidden] { display: none; }
+  body.side-open main { margin-right: var(--side-w); margin-left: max(0px, calc((100vw - var(--side-w) - 860px) / 2)); }
+  .side-head { display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .side-head div { flex: 1; }
+  .side-head h2 { font-size: 15px; margin: 0; }
+  .side-head p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+  aside .thread { flex: 1; overflow-y: auto; padding: 8px 16px; }
+  aside .compose { padding: 10px 16px 12px; border-top: 1px solid var(--border); }
+  aside .empty { color: var(--muted); font-size: 14px; }
+  .step.chatting { box-shadow: inset 3px 0 0 var(--accent); }
+  button.on { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 800px) { aside { width: 100%; } body.side-open main { margin-right: 0; } }
 </style>
 </head>
 <body>
 <main id="app"><p>Loading…</p></main>
+<aside id="side" hidden aria-label="Spin-off conversation"></aside>
 <footer><div>
   <span class="status" id="status"></span>
   <button id="export">Export runbook</button>
@@ -80,7 +95,7 @@
 </dialog>
 <script>
 const token = new URLSearchParams(location.search).get('t') || '';
-const state = { flow: null, expanded: null, chatOpen: new Set(), drafts: {}, working: new Set(), finished: false, error: '' };
+const state = { flow: null, expanded: null, panel: null, drafts: {}, working: new Set(), finished: false, error: '' };
 const $ = id => document.getElementById(id);
 
 async function api(method, path, body) {
@@ -142,21 +157,50 @@ function render() {
     <p class="goal">${esc(f.goal || '')}</p>
     <p class="progress">${counts.done || 0} done · ${counts.blocked || 0} blocked · ${counts.skipped || 0} skipped · ${counts.pending || 0} to go</p>
     ${f.steps.map((s, i) => stepHtml(s, i)).join('')}`;
+  renderSide();
   $('status').textContent = state.working.size ? 'Claude is working…' : '';
-  if (focused) { const el = app.querySelector(`[data-focus-key="${focused}"]`); if (el) { el.focus(); el.setSelectionRange?.(el.value.length, el.value.length); } }
-  app.querySelectorAll('.thread').forEach(t => (t.scrollTop = t.scrollHeight));
+  if (focused) { const el = document.querySelector(`[data-focus-key="${focused}"]`); if (el) { el.focus(); el.setSelectionRange?.(el.value.length, el.value.length); } }
+  document.querySelectorAll('.thread').forEach(t => (t.scrollTop = t.scrollHeight));
+}
+
+function renderSide() {
+  const side = $('side');
+  const s = state.panel && step(state.panel);
+  document.body.classList.toggle('side-open', !!s);
+  side.hidden = !s;
+  if (!s) { side.innerHTML = ''; return; }
+  const n = state.flow.steps.indexOf(s) + 1;
+  const working = state.working.has(s.id);
+  side.innerHTML = `
+    <div class="side-head">
+      <div><h2>Spin-off · Step ${n}</h2><p>${esc(s.title)}${s.status === 'pending' ? '' : ' · ' + esc(s.status)}</p></div>
+      <button data-act="close-panel" aria-label="Close spin-off">✕</button>
+    </div>
+    <div class="thread">
+      ${s.messages.length ? s.messages.map(msgHtml(s)).join('') : '<p class="empty">Ask Claude about this step. It knows the goal, every step and their statuses, and can run commands to diagnose.</p>'}
+      ${working ? '<p class="working">Claude is working… (it may be running commands)</p>' : ''}
+    </div>
+    <div class="compose">
+      <textarea rows="3" data-focus-key="in-${esc(s.id)}" data-input="${esc(s.id)}" placeholder="Describe what happened, paste the error…" ${working || state.finished ? 'disabled' : ''}>${esc(state.drafts[s.id] || '')}</textarea>
+      <p class="hint">Enter to send · Shift+Enter for a new line · Esc to close</p>
+    </div>`;
+}
+
+function openPanel(id) {
+  state.panel = id;
+  render();
+  document.querySelector(`[data-input="${CSS.escape(id)}"]`)?.focus();
 }
 
 function stepHtml(s, i) {
   const expanded = state.expanded === s.id;
   const working = state.working.has(s.id);
-  const chat = state.chatOpen.has(s.id) || s.messages.length > 0;
   const off = state.finished ? 'disabled' : '';
-  return `<section class="step ${expanded ? 'active' : ''}" data-status="${esc(s.status)}">
+  return `<section class="step ${expanded ? 'active' : ''} ${state.panel === s.id ? 'chatting' : ''}" data-status="${esc(s.status)}">
     <button class="head" data-act="toggle" data-id="${esc(s.id)}" aria-expanded="${expanded}">
       <span class="num">${s.status === 'done' ? '✓' : s.status === 'skipped' ? '–' : s.status === 'blocked' ? '!' : i + 1}</span>
       <span class="title">${esc(s.title)}</span>
-      <span class="badge">${s.status === 'pending' ? '' : s.status}${s.lesson ? ' · lesson' : ''}</span>
+      <span class="badge">${[s.status === 'pending' ? '' : esc(s.status), s.messages.length ? 'spin-off' : '', s.lesson ? 'lesson' : ''].filter(Boolean).join(' · ')}</span>
     </button>
     ${expanded ? `<div class="bodywrap">
       <div class="md">${md(s.body)}</div>
@@ -165,15 +209,8 @@ function stepHtml(s, i) {
         <button class="warn" data-act="status" data-status="blocked" data-id="${esc(s.id)}" ${off}>Blocked</button>
         <button data-act="status" data-status="skipped" data-id="${esc(s.id)}" ${off}>Skip</button>
         ${s.status !== 'pending' ? `<button data-act="status" data-status="pending" data-id="${esc(s.id)}" ${off}>Reset</button>` : ''}
-        ${chat ? '' : `<button data-act="chat" data-id="${esc(s.id)}" ${off}>Troubleshoot with Claude</button>`}
+        <button class="${state.panel === s.id ? 'on' : ''}" data-act="chat" data-id="${esc(s.id)}" aria-pressed="${state.panel === s.id}">Spin-off${s.messages.length ? ` (${s.messages.length})` : ''} →</button>
       </div>
-      ${chat ? `<div class="panel">
-        <h3>Spin-off</h3>
-        <div class="thread">${s.messages.map(msgHtml(s)).join('')}</div>
-        ${working ? '<p class="working">Claude is working… (it may be running commands)</p>' : ''}
-        <textarea rows="2" data-focus-key="in-${esc(s.id)}" data-input="${esc(s.id)}" placeholder="Describe what happened, paste the error…" ${working || state.finished ? 'disabled' : ''}>${esc(state.drafts[s.id] || '')}</textarea>
-        <p class="hint">Enter to send · Shift+Enter for a new line</p>
-      </div>` : ''}
       <div class="panel">
         <h3>Lesson for next time</h3>
         <div class="row">
@@ -205,7 +242,7 @@ async function setStatus(id, status) {
   await guarded(async () => {
     state.flow = await api('POST', `/api/steps/${id}/status`, { status });
     if (status === 'done' || status === 'skipped') state.expanded = nextOpenAfter(id);
-    if (status === 'blocked') { state.chatOpen.add(id); setTimeout(() => document.querySelector(`[data-input="${id}"]`)?.focus()); }
+    if (status === 'blocked') setTimeout(() => openPanel(id));
   });
 }
 
@@ -249,7 +286,8 @@ document.addEventListener('click', async e => {
   const { act, id } = b.dataset;
   if (act === 'toggle') { state.expanded = state.expanded === id ? null : id; render(); }
   if (act === 'status') setStatus(id, b.dataset.status);
-  if (act === 'chat') { state.chatOpen.add(id); render(); document.querySelector(`[data-input="${id}"]`)?.focus(); }
+  if (act === 'chat') { if (state.panel === id) { state.panel = null; render(); } else openPanel(id); }
+  if (act === 'close-panel') { state.panel = null; render(); }
   if (act === 'allow') converse(id, `/api/steps/${id}/allow`, { rule: b.dataset.rule });
   if (act === 'summarize') {
     state.working.add(id); render();
@@ -262,6 +300,7 @@ document.addEventListener('input', e => { if (e.target.dataset.input) state.draf
 document.addEventListener('keydown', e => {
   const id = e.target.dataset?.input;
   if (id && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(id); }
+  if (e.key === 'Escape' && state.panel && !$('dlg').open) { state.panel = null; render(); }
 });
 document.addEventListener('focusout', e => {
   const id = e.target.dataset?.lesson;
