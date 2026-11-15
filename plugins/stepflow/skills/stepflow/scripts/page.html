@@ -77,8 +77,9 @@
   dialog pre { max-height: 60vh; overflow: auto; background: var(--code); padding: 12px; border-radius: 8px; white-space: pre-wrap; }
   .banner { padding: 10px 14px; border-radius: 8px; background: var(--code); margin-bottom: 16px; }
   :root { --side-w: min(520px, 46vw); --foot-h: 53px; }
-  aside { position: fixed; top: 0; right: 0; bottom: var(--foot-h); width: var(--side-w); background: var(--card); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 5; }
+  aside { position: fixed; top: 0; right: 0; bottom: 0; width: var(--side-w); background: var(--card); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 5; }
   aside[hidden] { display: none; }
+  body.side-open footer { right: var(--side-w); }
   body.side-open main { margin-right: var(--side-w); margin-left: max(0px, calc((100vw - var(--side-w) - 860px) / 2)); }
   .side-head { display: flex; gap: 10px; align-items: flex-start; padding: 14px 16px; border-bottom: 1px solid var(--border); }
   .side-head div { flex: 1; }
@@ -89,7 +90,7 @@
   aside .empty { color: var(--muted); font-size: 14px; }
   .step.chatting { box-shadow: inset 3px 0 0 var(--accent); }
   button.on { border-color: var(--accent); color: var(--accent); }
-  @media (max-width: 800px) { aside { width: 100%; } body.side-open main { margin-right: 0; } }
+  @media (max-width: 800px) { aside { width: 100%; bottom: var(--foot-h); } body.side-open main, body.side-open footer { margin-right: 0; right: 0; } }
 </style>
 </head>
 <body>

@@ -1,10 +1,49 @@
-# Stepflow
+<h1 align="center">Stepflow</h1>
 
-When Claude gives you a ten-step procedure and step 4 fails, you either scroll back through the chat to find steps 5–10 or ask Claude to write them again. Stepflow keeps the steps and the troubleshooting apart:
+<p align="center">
+  <b>Work through Claude's multi-step instructions one step at a time — and fix the step that breaks without losing your place.</b>
+</p>
 
-- The steps open on a local web page, one at a time. Each step shows its commands (with a Copy button) and what you should see if it worked. Mark each one **Done**, **Blocked** or **Skip**.
-- Each step has a **Spin-off**: a separate Claude conversation in a side panel. It knows the goal and every step, so you can fix that one step there without losing your place.
-- **Finish** saves a `runbook.md` recording what worked and what needed fixing. Give it back to `/stepflow` next time, and you get a new flow with those fixes built into the steps.
+<p align="center">
+  <a href="#quick-start">Install</a> ·
+  <a href="#use">Use</a> ·
+  <a href="#what-the-spin-off-is-allowed-to-do">Permissions</a> ·
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/stepflow-dark.png">
+  <img alt="A stepflow page: two steps done, step 3 blocked and expanded with its command, expected result and lesson, and the step's Claude spin-off open in a panel on the right" src="docs/stepflow-light.png">
+</picture>
+
+When Claude gives you a ten-step procedure and step 4 fails, you either scroll back through the chat to find steps 5–10 or ask Claude to write them again. Stepflow keeps the steps and the troubleshooting apart.
+
+|   |   |
+|---|---|
+| **One step at a time** | The steps open on a local page. Only the current one is expanded, with its commands (one-click Copy) and the result you should see. Mark it **Done**, **Blocked** or **Skip** and the next one opens. |
+| **A Claude spin-off per step** | **Blocked** opens a side panel with a separate Claude conversation that knows the goal and every step. Fix the step there; your main chat and your place in the list stay untouched. |
+| **Lessons that carry over** | **Finish** saves a `runbook.md` of what worked and what needed fixing. Hand it back to `/stepflow` next time and the fixes are built into the steps. |
+
+## Quick start
+
+In a terminal, add the marketplace once:
+
+```
+claude plugin marketplace add SensoryDeprivation/AI.Skills
+```
+
+Then, inside Claude Code:
+
+```
+/plugin install stepflow@AI.Skills
+```
+
+Then, after Claude gives you a list of steps (or instead of asking for one):
+
+```
+/stepflow:stepflow                                   # turn the steps Claude just gave you into a page
+/stepflow:stepflow set up Postgres in Docker         # or let Claude work them out
+```
 
 ## Requirements
 
@@ -13,13 +52,6 @@ When Claude gives you a ten-step procedure and step 4 fails, you either scroll b
 - A browser.
 
 There's nothing else to install: no npm packages and no build step.
-
-## Install
-
-```
-claude plugin marketplace add SensoryDeprivation/AI.Skills
-/plugin install stepflow@AI.Skills
-```
 
 ## Use
 
