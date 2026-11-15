@@ -17,6 +17,17 @@
       "category": "productivity",
       "source": "./plugins/AdamJ",
       "homepage": "https://github.com/SensoryDeprivation/AI.Skills"
+    },
+    {
+      "name": "stepflow",
+      "description": "Step-by-step local page for multi-step instructions, with per-step Claude troubleshooting and a lessons-learned runbook export",
+      "author": {
+        "name": "Adam Jaszczurowski",
+        "url": "https://github.com/SensoryDeprivation"
+      },
+      "category": "productivity",
+      "source": "./plugins/stepflow",
+      "homepage": "https://github.com/SensoryDeprivation/AI.Skills"
     }
   ]
 }

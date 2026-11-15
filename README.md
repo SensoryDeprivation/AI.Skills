@@ -25,7 +25,17 @@ claude plugin marketplace add SensoryDeprivation/AI.Skills
 |-------|-------------|
 | `/AdamJ:secrets-check` | Scan modified files for API keys, tokens, and certificates before committing |
 | `/AdamJ:commit-safe` | Stage, commit, and push — runs secrets scan first, aborts if anything is found |
-| `/AdamJ:stepflow` | Turn multi-step instructions into a local step-by-step page with per-step Claude troubleshooting and a lessons-learned runbook export |
+
+## Stepflow (separate plugin)
+
+Install on its own, without the skills above:
+```
+/plugin install stepflow@AI.Skills
+```
+
+| Skill | Description |
+|-------|-------------|
+| `/stepflow:stepflow` | Turn multi-step instructions into a local step-by-step page with per-step Claude troubleshooting and a lessons-learned runbook export |
 
 ## License
 
