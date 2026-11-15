@@ -5,11 +5,10 @@ import { dirname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createStore, contextPrompt, statusLine, renderRunbook } from './flow.mjs';
+import { createStore, contextPrompt, statusLine, renderRunbook, STATUSES } from './flow.mjs';
 import { runClaude } from './claude.mjs';
 
 const PAGE = fileURLToPath(new URL('./page.html', import.meta.url));
-const STATUSES = ['pending', 'done', 'blocked', 'skipped'];
 const SUMMARIZE_PROMPT = 'Summarize the lesson from this conversation in 1-3 short lines: what was wrong with the step as written and what fixed it. Reply with only the lesson text.';
 
 class HttpError extends Error {
@@ -35,6 +34,15 @@ function openBrowser(url) {
   const [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', url]]
     : process.platform === 'darwin' ? ['open', [url]] : ['xdg-open', [url]];
   spawn(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+}
+
+async function isRunningFor(flow) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${flow.port}/api/flow`, { headers: { 'x-stepflow-token': flow.token }, signal: AbortSignal.timeout(2000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 function listen(server, port) {
@@ -171,6 +179,12 @@ export async function startServer(flowPath, { open = true, exitOnFinish = true }
     port = await listen(server, flow.port ?? 0);
   } catch (err) {
     if (err.code !== 'EADDRINUSE' || !flow.port) throw err;
+    // A second server on the same flow would overwrite the first one's changes: reuse it instead.
+    const url = `http://127.0.0.1:${flow.port}/?t=${flow.token}`;
+    if (await isRunningFor(flow)) {
+      if (open) openBrowser(url);
+      return { url, reused: true, close() {} };
+    }
     port = await listen(server, 0);
   }
   if (flow.port !== port) await store.update(() => { flow.port = port; });
@@ -186,6 +200,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error('usage: node server.mjs <flow.json> [--no-open]');
     process.exit(2);
   }
-  const { url } = await startServer(flowPath, { open: !flags.includes('--no-open') });
-  console.log(`Stepflow running: ${url}`);
+  const { url, reused } = await startServer(flowPath, { open: !flags.includes('--no-open') });
+  console.log(`Stepflow ${reused ? 'already running' : 'running'}: ${url}`);
 }

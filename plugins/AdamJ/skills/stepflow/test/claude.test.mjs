@@ -48,7 +48,14 @@ test('denials map to allow rules', async () => {
   assert.deepEqual(r.denials, [{ tool: 'Bash', input: { command: 'curl x' }, rule: 'Bash(curl x)' }]);
 });
 
-for (const mode of ['bad', 'fail']) {
+test('malformed denials are ignored, reply kept', async () => {
+  process.env.FAKE_MODE = 'baddenials';
+  const r = await runClaude({ ...base, isFirst: false, allowed: [] });
+  assert.equal(r.text, 'x');
+  assert.deepEqual(r.denials, []);
+});
+
+for (const mode of ['bad', 'fail', 'null']) {
   test(`${mode} output resolves with error`, async () => {
     process.env.FAKE_MODE = mode;
     const r = await runClaude({ ...base, isFirst: false, allowed: [] });
@@ -67,4 +74,14 @@ test('timeout kills and resolves with error', async () => {
   const r = await runClaude({ ...base, isFirst: false, allowed: [], timeoutMs: 300 });
   delete process.env.FAKE_DELAY;
   assert.match(r.error, /timed out/i);
+});
+
+test('timeout kills the whole process tree', async () => {
+  const mark = join(mkdtempSync(join(tmpdir(), 'stepflow-')), 'mark');
+  process.env.FAKE_MODE = 'grandchild';
+  process.env.FAKE_MARK = mark;
+  const r = await runClaude({ ...base, isFirst: false, allowed: [], timeoutMs: 500 });
+  assert.match(r.error, /timed out/i);
+  await new Promise(res => setTimeout(res, 2000));
+  assert.equal(existsSync(mark), false, 'grandchild survived the timeout');
 });

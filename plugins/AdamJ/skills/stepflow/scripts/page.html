@@ -152,8 +152,8 @@ function stepHtml(s, i) {
   const working = state.working.has(s.id);
   const chat = state.chatOpen.has(s.id) || s.messages.length > 0;
   const off = state.finished ? 'disabled' : '';
-  return `<section class="step ${expanded ? 'active' : ''}" data-status="${s.status}">
-    <button class="head" data-act="toggle" data-id="${s.id}" aria-expanded="${expanded}">
+  return `<section class="step ${expanded ? 'active' : ''}" data-status="${esc(s.status)}">
+    <button class="head" data-act="toggle" data-id="${esc(s.id)}" aria-expanded="${expanded}">
       <span class="num">${s.status === 'done' ? '✓' : s.status === 'skipped' ? '–' : s.status === 'blocked' ? '!' : i + 1}</span>
       <span class="title">${esc(s.title)}</span>
       <span class="badge">${s.status === 'pending' ? '' : s.status}${s.lesson ? ' · lesson' : ''}</span>
@@ -161,24 +161,24 @@ function stepHtml(s, i) {
     ${expanded ? `<div class="bodywrap">
       <div class="md">${md(s.body)}</div>
       <div class="actions">
-        <button class="primary" data-act="status" data-status="done" data-id="${s.id}" ${off}>Done</button>
-        <button class="warn" data-act="status" data-status="blocked" data-id="${s.id}" ${off}>Blocked</button>
-        <button data-act="status" data-status="skipped" data-id="${s.id}" ${off}>Skip</button>
-        ${s.status !== 'pending' ? `<button data-act="status" data-status="pending" data-id="${s.id}" ${off}>Reset</button>` : ''}
-        ${chat ? '' : `<button data-act="chat" data-id="${s.id}" ${off}>Troubleshoot with Claude</button>`}
+        <button class="primary" data-act="status" data-status="done" data-id="${esc(s.id)}" ${off}>Done</button>
+        <button class="warn" data-act="status" data-status="blocked" data-id="${esc(s.id)}" ${off}>Blocked</button>
+        <button data-act="status" data-status="skipped" data-id="${esc(s.id)}" ${off}>Skip</button>
+        ${s.status !== 'pending' ? `<button data-act="status" data-status="pending" data-id="${esc(s.id)}" ${off}>Reset</button>` : ''}
+        ${chat ? '' : `<button data-act="chat" data-id="${esc(s.id)}" ${off}>Troubleshoot with Claude</button>`}
       </div>
       ${chat ? `<div class="panel">
         <h3>Spin-off</h3>
         <div class="thread">${s.messages.map(msgHtml(s)).join('')}</div>
         ${working ? '<p class="working">Claude is working… (it may be running commands)</p>' : ''}
-        <textarea rows="2" data-focus-key="in-${s.id}" data-input="${s.id}" placeholder="Describe what happened, paste the error…" ${working || state.finished ? 'disabled' : ''}>${esc(state.drafts[s.id] || '')}</textarea>
+        <textarea rows="2" data-focus-key="in-${esc(s.id)}" data-input="${esc(s.id)}" placeholder="Describe what happened, paste the error…" ${working || state.finished ? 'disabled' : ''}>${esc(state.drafts[s.id] || '')}</textarea>
         <p class="hint">Enter to send · Shift+Enter for a new line</p>
       </div>` : ''}
       <div class="panel">
         <h3>Lesson for next time</h3>
         <div class="row">
-          <textarea rows="2" data-focus-key="lesson-${s.id}" data-lesson="${s.id}" placeholder="What was wrong with this step and what fixed it" ${off}>${esc(s.lesson)}</textarea>
-          ${s.sessionId ? `<button data-act="summarize" data-id="${s.id}" ${working || state.finished ? 'disabled' : ''}>Summarize fix</button>` : ''}
+          <textarea rows="2" data-focus-key="lesson-${esc(s.id)}" data-lesson="${esc(s.id)}" placeholder="What was wrong with this step and what fixed it" ${off}>${esc(s.lesson)}</textarea>
+          ${s.sessionId ? `<button data-act="summarize" data-id="${esc(s.id)}" ${working || state.finished ? 'disabled' : ''}>Summarize fix</button>` : ''}
         </div>
       </div>
     </div>` : ''}
@@ -190,8 +190,8 @@ const msgHtml = step => m => m.role === 'user'
   : `<div class="msg assistant">
       ${m.text ? `<div class="md">${md(m.text)}</div>` : ''}
       ${m.error ? `<p class="error">${esc(m.error)}</p>` : ''}
-      ${(m.denials || []).map(d => `<div class="denial"><span>Blocked:</span><code>${esc(d.rule)}</code>
-        ${step.allowed.includes(d.rule) ? '<span class="badge">allowed</span>' : `<button data-act="allow" data-id="${step.id}" data-rule="${esc(d.rule)}" ${state.working.has(step.id) || state.finished ? 'disabled' : ''}>Allow &amp; retry</button>`}</div>`).join('')}
+      ${(m.denials || []).map(d => `<div class="denial"><span>Blocked:</span><code>${esc(d.rule)}</code>${d.rule.includes('(') ? '' : '<span class="badge" title="Allowing this permits every use of the tool on this step">whole tool</span>'}
+        ${step.allowed.includes(d.rule) ? '<span class="badge">allowed</span>' : `<button data-act="allow" data-id="${esc(step.id)}" data-rule="${esc(d.rule)}" ${state.working.has(step.id) || state.finished ? 'disabled' : ''}>Allow &amp; retry</button>`}</div>`).join('')}
     </div>`;
 
 // --- actions ---

@@ -44,6 +44,6 @@ Then tell the user, in one or two lines: the page opened, the flow folder name (
 
 ## How the spin-off behaves (so you can explain it)
 
-- Runs `claude -p --permission-mode acceptEdits` in the flow's `cwd`: the user's allow rules apply and file edits are allowed. Anything else it tries is blocked and shown under its reply with an **Allow & retry** button that allows that exact command for that step only.
+- Runs `claude -p --permission-mode acceptEdits` in the flow's `cwd`: the user's allow rules apply and file edits are allowed. Anything else it tries is blocked and shown under its reply with an **Allow & retry** button. For shell tools that allows that exact command for that step only; for tools without a command (e.g. Write outside `cwd`, WebFetch, MCP tools) it allows the whole tool for that step, and the page labels those "whole tool".
 - **Summarize fix** turns the spin-off conversation into the step's lesson; the lesson field can also be edited by hand.
 - State (statuses, threads, lessons) is in `flow.json`; nothing is lost by closing the tab or rebooting.

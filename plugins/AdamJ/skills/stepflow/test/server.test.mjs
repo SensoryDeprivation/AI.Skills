@@ -141,3 +141,11 @@ test('restart reuses saved port', async () => {
   server = await startServer(flowPath, { open: false, exitOnFinish: false });
   assert.equal(new URL(server.url).port, port);
 });
+
+test('second server on the same flow reuses the running one', async () => {
+  const again = await startServer(flowPath, { open: false, exitOnFinish: false });
+  assert.equal(again.url, server.url);
+  assert.equal(again.reused, true);
+  again.close();
+  assert.equal((await call('GET', '/api/flow')).status, 200);
+});

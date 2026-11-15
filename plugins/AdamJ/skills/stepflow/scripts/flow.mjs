@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 
+export const STATUSES = ['pending', 'done', 'blocked', 'skipped'];
+
 export function normalize(flow) {
   let changed = false;
   const fill = (obj, key, value) => {
@@ -11,9 +13,23 @@ export function normalize(flow) {
   fill(flow, 'token', randomBytes(16).toString('hex'));
   fill(flow, 'cwd', homedir());
   fill(flow, 'steps', []);
-  flow.steps.forEach((step, i) => {
-    fill(step, 'id', `s${i + 1}`);
-    fill(step, 'status', 'pending');
+  // Ids end up in HTML attributes and file names, so only allow a safe charset.
+  const used = new Set();
+  for (const step of flow.steps) {
+    if (step.id === undefined) continue;
+    if (typeof step.id !== 'string' || !/^[\w-]+$/.test(step.id)) throw new Error(`Invalid step id: ${JSON.stringify(step.id)}`);
+    if (used.has(step.id)) throw new Error(`Duplicate step id: ${step.id}`);
+    used.add(step.id);
+  }
+  let next = 1;
+  flow.steps.forEach(step => {
+    if (step.id === undefined) {
+      while (used.has(`s${next}`)) next++;
+      step.id = `s${next}`;
+      used.add(step.id);
+      changed = true;
+    }
+    if (!STATUSES.includes(step.status)) { step.status = 'pending'; changed = true; }
     fill(step, 'lesson', '');
     fill(step, 'allowed', []);
     fill(step, 'messages', []);
@@ -28,7 +44,7 @@ function save(path, flow) {
 }
 
 export function loadFlow(path) {
-  const flow = JSON.parse(readFileSync(path, 'utf8'));
+  const flow = JSON.parse(readFileSync(path, 'utf8').replace(/^﻿/, ''));
   if (normalize(flow)) save(path, flow);
   return flow;
 }

@@ -10,6 +10,14 @@ process.stdin.on('end', async () => {
   const sid = args[args.indexOf('--session-id') + 1] || args[args.indexOf('--resume') + 1];
   const mode = process.env.FAKE_MODE ?? 'ok';
   if (mode === 'bad') return process.stdout.write('not json');
+  if (mode === 'null') return process.stdout.write('null');
+  if (mode === 'baddenials') return process.stdout.write(JSON.stringify({ result: 'x', permission_denials: 'nope' }));
+  if (mode === 'grandchild') {
+    // Simulates a tool subprocess that outlives a timeout kill unless the whole tree is killed.
+    const { spawn } = await import('node:child_process');
+    spawn(process.execPath, ['-e', `setTimeout(() => require('fs').writeFileSync(${JSON.stringify(process.env.FAKE_MARK)}, 'alive'), 1500)`], { stdio: 'ignore' });
+    await new Promise(r => setTimeout(r, 5000));
+  }
   if (mode === 'fail') { process.stderr.write('boom'); process.exit(1); }
   const denials = mode === 'deny'
     ? [{ tool_name: 'Bash', tool_use_id: 't1', tool_input: { command: 'curl x' } }]

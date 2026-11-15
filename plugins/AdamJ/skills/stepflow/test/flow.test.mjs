@@ -102,3 +102,29 @@ test('renderRunbook lists steps needing attention', () => {
   assert.match(attention, /Install module/);
   assert.doesNotMatch(attention, /Configure/);
 });
+
+test('normalize skips ids already used by hand-written steps', () => {
+  const flow = { steps: [{ title: 'A' }, { id: 's1', title: 'B' }] };
+  normalize(flow);
+  const ids = flow.steps.map(s => s.id);
+  assert.equal(new Set(ids).size, 2);
+  assert.equal(flow.steps[1].id, 's1');
+});
+
+test('normalize rejects duplicate or unsafe hand-written ids', () => {
+  assert.throws(() => normalize({ steps: [{ id: 'a', title: 'A' }, { id: 'a', title: 'B' }] }), /duplicate/i);
+  assert.throws(() => normalize({ steps: [{ id: 'a"><img src=x>', title: 'A' }] }), /invalid step id/i);
+  assert.throws(() => normalize({ steps: [{ id: '../x', title: 'A' }] }), /invalid step id/i);
+});
+
+test('normalize resets unknown status to pending', () => {
+  const flow = { steps: [{ title: 'A', status: '"><script>' }] };
+  assert.equal(normalize(flow), true);
+  assert.equal(flow.steps[0].status, 'pending');
+});
+
+test('loadFlow accepts a UTF-8 BOM', () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'stepflow-')), 'flow.json');
+  writeFileSync(path, '﻿' + JSON.stringify(sample()));
+  assert.equal(loadFlow(path).steps.length, 3);
+});
