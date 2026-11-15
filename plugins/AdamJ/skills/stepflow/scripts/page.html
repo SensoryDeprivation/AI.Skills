@@ -1,1 +1,309 @@
-<!doctype html><html><body>stub</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stepflow</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --border: #dddcd6;
+    --accent: #2f6fdf; --done: #2e8b57; --blocked: #c2410c; --skipped: #8a8a85; --code: #f0efea; --error: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --card: #20201e; --text: #ecebe6; --muted: #9b9a94; --border: #34332f;
+      --accent: #6c9cf0; --done: #4fb07a; --blocked: #f08a4b; --skipped: #77766f; --code: #2a2a27; --error: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 96px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .goal { color: var(--muted); margin: 0 0 4px; }
+  .progress { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .step { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+  .step.active { border-color: var(--accent); }
+  .head { all: unset; box-sizing: border-box; display: flex; gap: 12px; align-items: center; width: 100%; padding: 12px 16px; cursor: pointer; }
+  .head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; border: 1.5px solid var(--border); flex: none; }
+  .step[data-status=done] .num { background: var(--done); border-color: var(--done); color: #fff; }
+  .step[data-status=blocked] .num { background: var(--blocked); border-color: var(--blocked); color: #fff; }
+  .step[data-status=skipped] .num { color: var(--skipped); border-style: dashed; }
+  .title { flex: 1; font-weight: 600; }
+  .step[data-status=done] .title, .step[data-status=skipped] .title { color: var(--muted); font-weight: 500; }
+  .badge { font-size: 12px; color: var(--muted); }
+  .bodywrap { padding: 0 16px 16px 54px; }
+  .md p { margin: 8px 0; }
+  .md ul, .md ol { margin: 8px 0; padding-left: 22px; }
+  .md code { background: var(--code); padding: 1px 5px; border-radius: 4px; font: 13px/1.4 ui-monospace, Consolas, monospace; }
+  .md pre { position: relative; background: var(--code); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+  .md pre code { background: none; padding: 0; white-space: pre; }
+  .md a { color: var(--accent); }
+  .copy { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 2px 8px; }
+  button { font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.warn { color: var(--blocked); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .panel { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .msg { padding: 8px 12px; border-radius: 8px; margin: 6px 0; }
+  .msg.user { background: var(--code); white-space: pre-wrap; }
+  .msg.assistant { border: 1px solid var(--border); }
+  .msg .error { color: var(--error); }
+  .denial { display: flex; gap: 8px; align-items: center; margin-top: 6px; font-size: 13px; }
+  .denial code { flex: 1; overflow-wrap: anywhere; }
+  .working { color: var(--muted); font-style: italic; margin: 6px 0; }
+  textarea { width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; resize: vertical; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .row { display: flex; gap: 8px; align-items: flex-start; }
+  .row textarea { flex: 1; }
+  footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--border); }
+  footer div { max-width: 860px; margin: 0 auto; padding: 10px 16px; display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  footer .status { flex: 1; color: var(--muted); font-size: 13px; }
+  dialog { max-width: 760px; width: calc(100% - 32px); background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 10px; }
+  dialog pre { max-height: 60vh; overflow: auto; background: var(--code); padding: 12px; border-radius: 8px; white-space: pre-wrap; }
+  .banner { padding: 10px 14px; border-radius: 8px; background: var(--code); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<main id="app"><p>Loading…</p></main>
+<footer><div>
+  <span class="status" id="status"></span>
+  <button id="export">Export runbook</button>
+  <button id="finish" class="primary">Finish</button>
+</div></footer>
+<dialog id="dlg"><h3 id="dlgTitle">Runbook</h3><pre id="dlgBody"></pre>
+  <div class="actions"><button id="dlgDownload">Download</button><button id="dlgCopy">Copy</button><button id="dlgClose">Close</button></div>
+</dialog>
+<script>
+const token = new URLSearchParams(location.search).get('t') || '';
+const state = { flow: null, expanded: null, chatOpen: new Set(), drafts: {}, working: new Set(), finished: false, error: '' };
+const $ = id => document.getElementById(id);
+
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: { 'content-type': 'application/json', 'x-stepflow-token': token }, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+// --- minimal markdown (input is escaped first, so step text can never inject HTML) ---
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function inline(s) {
+  return s
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*\w])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+function md(src) {
+  const out = [];
+  const parts = esc(src).split(/^```[^\n]*\n([\s\S]*?)^```[ \t]*$/m);
+  parts.forEach((part, i) => {
+    if (i % 2) { out.push(`<pre><button class="copy" type="button">Copy</button><code>${part.replace(/\n$/, '')}</code></pre>`); return; }
+    let list = null;
+    const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+    for (const block of part.split(/\n{2,}/)) {
+      for (const line of block.split('\n')) {
+        let m;
+        if (!line.trim()) continue;
+        if ((m = line.match(/^(#{1,4})\s+(.*)/))) { close(); out.push(`<p><strong>${inline(m[2])}</strong></p>`); }
+        else if ((m = line.match(/^\s*[-*]\s+(.*)/))) { if (list !== 'ul') { close(); out.push('<ul>'); list = 'ul'; } out.push(`<li>${inline(m[1])}</li>`); }
+        else if ((m = line.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== 'ol') { close(); out.push('<ol>'); list = 'ol'; } out.push(`<li>${inline(m[1])}</li>`); }
+        else { close(); out.push(`<p>${inline(line)}</p>`); }
+      }
+      close();
+    }
+  });
+  return out.join('');
+}
+
+// --- navigation ---
+const open = s => s.status === 'pending' || s.status === 'blocked';
+function nextOpenAfter(id) {
+  const steps = state.flow.steps, i = steps.findIndex(s => s.id === id);
+  return (steps.slice(i + 1).find(open) || steps.find(open) || {}).id ?? null;
+}
+
+// --- rendering ---
+function render() {
+  const app = $('app');
+  const f = state.flow;
+  if (!f) { app.innerHTML = `<p class="banner">${esc(state.error || 'Loading…')}</p>`; return; }
+  const focused = document.activeElement?.dataset?.focusKey;
+  const counts = f.steps.reduce((c, s) => (c[s.status] = (c[s.status] || 0) + 1, c), {});
+  app.innerHTML = `
+    ${state.finished ? `<p class="banner">Finished. Runbook saved to <code>${esc(state.finished)}</code>. The server has stopped; you can close this tab.</p>` : ''}
+    ${state.error ? `<p class="banner" style="color:var(--error)">${esc(state.error)}</p>` : ''}
+    <h1>${esc(f.title || 'Stepflow')}</h1>
+    <p class="goal">${esc(f.goal || '')}</p>
+    <p class="progress">${counts.done || 0} done · ${counts.blocked || 0} blocked · ${counts.skipped || 0} skipped · ${counts.pending || 0} to go</p>
+    ${f.steps.map((s, i) => stepHtml(s, i)).join('')}`;
+  $('status').textContent = state.working.size ? 'Claude is working…' : '';
+  if (focused) { const el = app.querySelector(`[data-focus-key="${focused}"]`); if (el) { el.focus(); el.setSelectionRange?.(el.value.length, el.value.length); } }
+  app.querySelectorAll('.thread').forEach(t => (t.scrollTop = t.scrollHeight));
+}
+
+function stepHtml(s, i) {
+  const expanded = state.expanded === s.id;
+  const working = state.working.has(s.id);
+  const chat = state.chatOpen.has(s.id) || s.messages.length > 0;
+  const off = state.finished ? 'disabled' : '';
+  return `<section class="step ${expanded ? 'active' : ''}" data-status="${s.status}">
+    <button class="head" data-act="toggle" data-id="${s.id}" aria-expanded="${expanded}">
+      <span class="num">${s.status === 'done' ? '✓' : s.status === 'skipped' ? '–' : s.status === 'blocked' ? '!' : i + 1}</span>
+      <span class="title">${esc(s.title)}</span>
+      <span class="badge">${s.status === 'pending' ? '' : s.status}${s.lesson ? ' · lesson' : ''}</span>
+    </button>
+    ${expanded ? `<div class="bodywrap">
+      <div class="md">${md(s.body)}</div>
+      <div class="actions">
+        <button class="primary" data-act="status" data-status="done" data-id="${s.id}" ${off}>Done</button>
+        <button class="warn" data-act="status" data-status="blocked" data-id="${s.id}" ${off}>Blocked</button>
+        <button data-act="status" data-status="skipped" data-id="${s.id}" ${off}>Skip</button>
+        ${s.status !== 'pending' ? `<button data-act="status" data-status="pending" data-id="${s.id}" ${off}>Reset</button>` : ''}
+        ${chat ? '' : `<button data-act="chat" data-id="${s.id}" ${off}>Troubleshoot with Claude</button>`}
+      </div>
+      ${chat ? `<div class="panel">
+        <h3>Spin-off</h3>
+        <div class="thread">${s.messages.map(msgHtml(s)).join('')}</div>
+        ${working ? '<p class="working">Claude is working… (it may be running commands)</p>' : ''}
+        <textarea rows="2" data-focus-key="in-${s.id}" data-input="${s.id}" placeholder="Describe what happened, paste the error…" ${working || state.finished ? 'disabled' : ''}>${esc(state.drafts[s.id] || '')}</textarea>
+        <p class="hint">Enter to send · Shift+Enter for a new line</p>
+      </div>` : ''}
+      <div class="panel">
+        <h3>Lesson for next time</h3>
+        <div class="row">
+          <textarea rows="2" data-focus-key="lesson-${s.id}" data-lesson="${s.id}" placeholder="What was wrong with this step and what fixed it" ${off}>${esc(s.lesson)}</textarea>
+          ${s.sessionId ? `<button data-act="summarize" data-id="${s.id}" ${working || state.finished ? 'disabled' : ''}>Summarize fix</button>` : ''}
+        </div>
+      </div>
+    </div>` : ''}
+  </section>`;
+}
+
+const msgHtml = step => m => m.role === 'user'
+  ? `<div class="msg user">${esc(m.text)}</div>`
+  : `<div class="msg assistant">
+      ${m.text ? `<div class="md">${md(m.text)}</div>` : ''}
+      ${m.error ? `<p class="error">${esc(m.error)}</p>` : ''}
+      ${(m.denials || []).map(d => `<div class="denial"><span>Blocked:</span><code>${esc(d.rule)}</code>
+        ${step.allowed.includes(d.rule) ? '<span class="badge">allowed</span>' : `<button data-act="allow" data-id="${step.id}" data-rule="${esc(d.rule)}" ${state.working.has(step.id) || state.finished ? 'disabled' : ''}>Allow &amp; retry</button>`}</div>`).join('')}
+    </div>`;
+
+// --- actions ---
+const step = id => state.flow.steps.find(s => s.id === id);
+async function guarded(fn) {
+  try { state.error = ''; await fn(); } catch (e) { state.error = e.message; }
+  render();
+}
+
+async function setStatus(id, status) {
+  await guarded(async () => {
+    state.flow = await api('POST', `/api/steps/${id}/status`, { status });
+    if (status === 'done' || status === 'skipped') state.expanded = nextOpenAfter(id);
+    if (status === 'blocked') { state.chatOpen.add(id); setTimeout(() => document.querySelector(`[data-input="${id}"]`)?.focus()); }
+  });
+}
+
+async function converse(id, path, body, optimistic) {
+  state.working.add(id);
+  if (optimistic) step(id).messages.push({ role: 'user', text: optimistic });
+  render();
+  try {
+    const { messages } = await api('POST', path, body);
+    step(id).messages = messages;
+    if (path.endsWith('/allow') && !step(id).allowed.includes(body.rule)) step(id).allowed.push(body.rule);
+  } catch (e) {
+    state.error = e.message;
+    await refresh();
+  } finally {
+    state.working.delete(id);
+    render();
+    document.querySelector(`[data-input="${id}"]`)?.focus();
+  }
+}
+
+function send(id) {
+  const text = (state.drafts[id] || '').trim();
+  if (!text || state.working.has(id)) return;
+  state.drafts[id] = '';
+  converse(id, `/api/steps/${id}/chat`, { message: text }, text);
+}
+
+async function refresh() {
+  try { state.flow = await api('GET', '/api/flow'); } catch (e) { state.error = e.message; }
+}
+
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.classList.contains('copy')) {
+    await navigator.clipboard.writeText(b.nextElementSibling.textContent);
+    b.textContent = 'Copied'; setTimeout(() => (b.textContent = 'Copy'), 1200);
+    return;
+  }
+  const { act, id } = b.dataset;
+  if (act === 'toggle') { state.expanded = state.expanded === id ? null : id; render(); }
+  if (act === 'status') setStatus(id, b.dataset.status);
+  if (act === 'chat') { state.chatOpen.add(id); render(); document.querySelector(`[data-input="${id}"]`)?.focus(); }
+  if (act === 'allow') converse(id, `/api/steps/${id}/allow`, { rule: b.dataset.rule });
+  if (act === 'summarize') {
+    state.working.add(id); render();
+    await guarded(async () => { const { lesson } = await api('POST', `/api/steps/${id}/summarize`); step(id).lesson = lesson; });
+    state.working.delete(id); render();
+  }
+});
+
+document.addEventListener('input', e => { if (e.target.dataset.input) state.drafts[e.target.dataset.input] = e.target.value; });
+document.addEventListener('keydown', e => {
+  const id = e.target.dataset?.input;
+  if (id && e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(id); }
+});
+document.addEventListener('focusout', e => {
+  const id = e.target.dataset?.lesson;
+  if (id && e.target.value !== step(id).lesson) {
+    const lesson = e.target.value;
+    guarded(async () => { state.flow = await api('POST', `/api/steps/${id}/lesson`, { lesson }); });
+  }
+});
+
+let runbook = { markdown: '', path: '' };
+function showRunbook(title) {
+  $('dlgTitle').textContent = title;
+  $('dlgBody').textContent = runbook.markdown;
+  $('dlg').showModal();
+}
+$('export').onclick = () => guarded(async () => { runbook = await api('POST', '/api/export'); showRunbook(`Runbook — saved to ${runbook.path}`); });
+$('finish').onclick = () => {
+  if (!confirm('Finish this stepflow? The runbook is saved and the local server stops.')) return;
+  guarded(async () => {
+    runbook = await api('POST', '/api/finish');
+    state.finished = runbook.path;
+    $('export').disabled = $('finish').disabled = true;
+    showRunbook(`Runbook — saved to ${runbook.path}`);
+  });
+};
+$('dlgClose').onclick = () => $('dlg').close();
+$('dlgCopy').onclick = () => navigator.clipboard.writeText(runbook.markdown);
+$('dlgDownload').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([runbook.markdown], { type: 'text/markdown' }));
+  a.download = 'runbook.md';
+  a.click();
+};
+
+(async () => {
+  await refresh();
+  if (state.flow) {
+    state.expanded = (state.flow.steps.find(open) || {}).id ?? null;
+    document.title = `${state.flow.title || 'Stepflow'} — Stepflow`;
+  }
+  render();
+})();
+</script>
+</body>
+</html>
