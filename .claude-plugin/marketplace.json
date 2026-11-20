@@ -28,6 +28,17 @@
       "category": "productivity",
       "source": "./plugins/stepflow",
       "homepage": "https://github.com/SensoryDeprivation/AI.Skills"
+    },
+    {
+      "name": "health-patterns",
+      "description": "Turns health and wellbeing conversations into a when → what log of what you said, asking follow-up questions to help spot patterns",
+      "author": {
+        "name": "Adam Jaszczurowski",
+        "url": "https://github.com/SensoryDeprivation"
+      },
+      "category": "productivity",
+      "source": "./plugins/health-patterns",
+      "homepage": "https://github.com/SensoryDeprivation/AI.Skills"
     }
   ]
 }

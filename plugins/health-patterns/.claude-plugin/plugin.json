@@ -1,0 +1,12 @@
+{
+  "name": "health-patterns",
+  "displayName": "Health Patterns",
+  "description": "Turns health and wellbeing conversations into a when → what log of what you said, asking follow-up questions to help spot patterns",
+  "version": "0.1.0",
+  "author": {
+    "name": "Adam Jaszczurowski",
+    "url": "https://github.com/SensoryDeprivation"
+  },
+  "homepage": "https://github.com/SensoryDeprivation/AI.Skills/tree/main/plugins/health-patterns",
+  "license": "CC-BY-4.0"
+}

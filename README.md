@@ -37,6 +37,16 @@ Install on its own, without the skills above (details in [plugins/stepflow/READM
 |-------|-------------|
 | `/stepflow:stepflow` | Turn multi-step instructions into a local step-by-step page with per-step Claude troubleshooting and a lessons-learned runbook export |
 
+## Health Patterns (separate plugin)
+
+```
+/plugin install health-patterns@AI.Skills
+```
+
+| Skill | Description |
+|-------|-------------|
+| `/health-patterns:health-patterns` | Turns health and wellbeing talk into a `when → what` log (`~/health-log.csv`) of what you said; asks follow-up questions and connects new statements to old ones. No advice. |
+
 ## License
 
 [CC BY 4.0](LICENSE) — free to use and adapt with attribution.
