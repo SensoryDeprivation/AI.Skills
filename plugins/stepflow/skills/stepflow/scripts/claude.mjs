@@ -1,4 +1,6 @@
 // Runs one `claude -p` turn for a step's spin-off. Never rejects: failures resolve with `error`.
+// dontAsk, not acceptEdits: acceptEdits routes every blocked call through the user's
+// PermissionRequest hooks first, which can stall each one for most of a minute.
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, delimiter } from 'node:path';
@@ -36,11 +38,17 @@ function killTree(child) {
   }
 }
 
+// A short, one-line description of what a tool call is doing, for the progress line.
+const describe = (name, input = {}) => {
+  const detail = input.command ?? input.file_path ?? input.pattern ?? input.url ?? input.query ?? '';
+  return { tool: name, detail: String(detail).split('\n')[0].slice(0, 160) };
+};
+
 const toRule = d => (d.tool_input?.command ? `${d.tool_name}(${d.tool_input.command})` : d.tool_name);
 
-export function runClaude({ message, cwd, sessionId, isFirst, contextFile, allowed = [], timeoutMs = 600000 }) {
+export function runClaude({ message, cwd, sessionId, isFirst, contextFile, allowed = [], timeoutMs = 600000, onProgress = () => {} }) {
   const [bin, lead] = claudeCommand();
-  const args = [...lead, '-p', '--output-format', 'json', '--permission-mode', 'acceptEdits'];
+  const args = [...lead, '-p', '--output-format', 'stream-json', '--verbose', '--permission-mode', 'dontAsk'];
   if (isFirst) args.push('--session-id', sessionId, '--append-system-prompt-file', contextFile);
   else args.push('--resume', sessionId);
   if (allowed.length) args.push('--allowedTools', ...allowed);
@@ -51,14 +59,29 @@ export function runClaude({ message, cwd, sessionId, isFirst, contextFile, allow
     const child = spawn(bin, args, { cwd, windowsHide: true, detached: process.platform !== 'win32' });
     // On timeout kill the whole tree (tool subprocesses too); resolve once the process has exited.
     const timer = setTimeout(() => { timedOut = true; killTree(child); }, timeoutMs);
-    child.stdout.on('data', d => (stdout += d));
+    // stream-json: one event per line. Report tool calls as they start; keep the final result line.
+    let pending = '', last;
+    const onLine = line => {
+      let e;
+      try { e = JSON.parse(line); } catch { return; }
+      if (e?.type === 'result') last = e;
+      if (e?.type === 'assistant' && Array.isArray(e.message?.content)) {
+        for (const b of e.message.content) if (b?.type === 'tool_use' && typeof b.name === 'string') onProgress(describe(b.name, b.input));
+      }
+    };
+    child.stdout.on('data', d => {
+      stdout += d;
+      const lines = (pending + d).split('\n');
+      pending = lines.pop();
+      lines.forEach(onLine);
+    });
     child.stderr.on('data', d => (stderr += d));
     child.on('error', err => done({ error: `Could not start claude: ${err.message}` }));
     child.on('close', code => {
       if (timedOut) return done({ error: `Claude timed out after ${Math.round(timeoutMs / 1000)}s` });
-      let r;
-      try { r = JSON.parse(stdout); } catch {}
-      if (!r || typeof r !== 'object') {
+      if (pending) onLine(pending);
+      const r = last;
+      if (!r) {
         return done({ error: `claude exited ${code}: ${(stderr || stdout).trim().slice(0, 2000) || 'no output'}` });
       }
       done({

@@ -21,8 +21,9 @@ test('first turn starts session with context file', async () => {
   const r = await runClaude({ ...base, isFirst: true, contextFile: 'ctx.md', allowed: [] });
   const { args, input } = lastCall();
   assert.ok(args.includes('-p'));
-  assert.deepEqual(args.slice(args.indexOf('--output-format'), args.indexOf('--output-format') + 2), ['--output-format', 'json']);
-  assert.deepEqual(args.slice(args.indexOf('--permission-mode'), args.indexOf('--permission-mode') + 2), ['--permission-mode', 'acceptEdits']);
+  assert.deepEqual(args.slice(args.indexOf('--output-format'), args.indexOf('--output-format') + 2), ['--output-format', 'stream-json']);
+  assert.ok(args.includes('--verbose'));
+  assert.deepEqual(args.slice(args.indexOf('--permission-mode'), args.indexOf('--permission-mode') + 2), ['--permission-mode', 'dontAsk']);
   assert.equal(args[args.indexOf('--session-id') + 1], base.sessionId);
   assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], 'ctx.md');
   assert.ok(!args.includes('--resume'));
@@ -40,6 +41,12 @@ test('later turn resumes and passes allowed tools', async () => {
   assert.ok(!args.includes('--session-id'));
   assert.ok(!args.includes('--append-system-prompt-file'));
   assert.equal(args[args.indexOf('--allowedTools') + 1], 'Bash(curl x)');
+});
+
+test('tool calls are reported as progress, first line only', async () => {
+  const seen = [];
+  await runClaude({ ...base, isFirst: false, onProgress: p => seen.push(p) });
+  assert.deepEqual(seen, [{ tool: 'Bash', detail: 'ls -la' }]);
 });
 
 test('denials map to allow rules', async () => {

@@ -1,15 +1,19 @@
 // Local stepflow server: `node server.mjs <flow.json> [--no-open]`.
 import { createServer } from 'node:http';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { createStore, contextPrompt, statusLine, renderRunbook, STATUSES } from './flow.mjs';
+import { createStore, contextPrompt, statusLine, renderRunbook, learningInput, hasLearnings, LEARN_PROMPT, STATUSES } from './flow.mjs';
 import { runClaude } from './claude.mjs';
 
 const PAGE = fileURLToPath(new URL('./page.html', import.meta.url));
 const SUMMARIZE_PROMPT = 'Summarize the lesson from this conversation in 1-3 short lines: what was wrong with the step as written and what fixed it. Reply with only the lesson text.';
+
+// Every export is also kept here, one file per flow, so later sessions can reuse it.
+export const runbookLibrary = () => join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), 'stepflow', 'runbooks');
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -61,6 +65,7 @@ export async function startServer(flowPath, { open = true, exitOnFinish = true }
   const store = createStore(flowPath);
   const { flow } = store;
   const busy = new Set();
+  const progress = {}; // step id -> { since, tool, detail } while a turn runs
   let port;
 
   const findStep = id => {
@@ -73,6 +78,7 @@ export async function startServer(flowPath, { open = true, exitOnFinish = true }
   async function turn(step, text, { record = true } = {}) {
     if (busy.has(step.id)) throw new HttpError(409, 'Claude is still working on this step');
     busy.add(step.id);
+    progress[step.id] = { since: new Date().toISOString() };
     try {
       const isFirst = !step.sessionId;
       const contextFile = join(dir, `context-${step.id}.md`);
@@ -86,6 +92,7 @@ export async function startServer(flowPath, { open = true, exitOnFinish = true }
       const result = await runClaude({
         message: isFirst ? text : `${statusLine(flow)}\n\n${text}`,
         cwd: flow.cwd, sessionId: step.sessionId, isFirst, contextFile, allowed: step.allowed,
+        onProgress: p => Object.assign(progress[step.id], p),
       });
       await store.update(() => {
         if (isFirst && result.error) step.sessionId = undefined; // let the next message start a fresh session
@@ -94,19 +101,39 @@ export async function startServer(flowPath, { open = true, exitOnFinish = true }
       return result;
     } finally {
       busy.delete(step.id);
+      delete progress[step.id];
     }
   }
 
-  const exportRunbook = () => {
-    const markdown = renderRunbook(flow);
-    const path = join(dir, 'runbook.md');
-    writeFileSync(path, markdown);
-    return { path, markdown };
-  };
+  // A one-off claude turn (fresh session each export) that writes the "What we learned" section.
+  async function learn() {
+    if (!hasLearnings(flow)) return '';
+    const contextFile = join(dir, 'context-learn.md');
+    writeFileSync(contextFile, LEARN_PROMPT);
+    const result = await runClaude({ message: learningInput(flow), cwd: dir, sessionId: randomUUID(), isFirst: true, contextFile, timeoutMs: 300000 });
+    return result.error || !result.text.trim() ? `_Could not summarize the learnings: ${result.error || 'empty reply'}_` : result.text;
+  }
+
+  let exporting = false;
+  async function exportRunbook() {
+    if (exporting) throw new HttpError(409, 'An export is already running');
+    exporting = true;
+    try {
+      const markdown = renderRunbook(flow, await learn());
+      const path = join(dir, 'runbook.md');
+      writeFileSync(path, markdown);
+      const libraryPath = join(runbookLibrary(), `${basename(dir)}.md`);
+      mkdirSync(dirname(libraryPath), { recursive: true });
+      writeFileSync(libraryPath, markdown);
+      return { path, libraryPath, markdown };
+    } finally {
+      exporting = false;
+    }
+  }
 
   const publicFlow = () => {
     const { token, ...rest } = flow;
-    return { ...rest, busy: [...busy] };
+    return { ...rest, busy: [...busy], progress };
   };
 
   async function route(req, res) {
@@ -123,7 +150,7 @@ export async function startServer(flowPath, { open = true, exitOnFinish = true }
     if (req.method !== 'POST') throw new HttpError(404, 'Not found');
     if (url.pathname === '/api/export') return exportRunbook();
     if (url.pathname === '/api/finish') {
-      const result = exportRunbook();
+      const result = await exportRunbook();
       res.on('finish', () => { server.close(); if (exitOnFinish) process.exit(0); });
       return result;
     }

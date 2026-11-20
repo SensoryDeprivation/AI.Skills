@@ -22,7 +22,7 @@ When Claude gives you a ten-step procedure and step 4 fails, you either scroll b
 |---|---|
 | **One step at a time** | The steps open on a local page. Only the current one is expanded, with its commands (one-click Copy) and the result you should see. Mark it **Done**, **Blocked** or **Skip** and the next one opens. |
 | **A Claude spin-off per step** | **Blocked** opens a side panel with a separate Claude conversation that knows the goal and every step. Fix the step there; your main chat and your place in the list stay untouched. |
-| **Lessons that carry over** | **Finish** saves a `runbook.md` of what worked and what needed fixing. Hand it back to `/stepflow` next time and the fixes are built into the steps. |
+| **Lessons that carry over** | **Finish** has Claude write up what worked, what didn't and what was confusing, and saves it as `runbook.md`. The next `/stepflow` for the same procedure finds it and builds the fixes into the steps. |
 
 ## Quick start
 
@@ -64,24 +64,24 @@ There's nothing else to install: no npm packages and no build step.
 
 The page opens by itself. Work through the steps top to bottom; only the current step is expanded.
 
-- **Done** or **Skip** moves you to the next step.
+- **Done** or **Skip** moves you to the next step and closes that step's spin-off.
 - **Blocked** opens the spin-off. Describe what went wrong and press Enter to send; Shift+Enter adds a new line.
 - **Summarize fix** turns the spin-off conversation into a short lesson for that step. You can also type the lesson yourself.
-- **Finish** saves `runbook.md` and stops the server.
+- **Export** saves the runbook; **Finish** saves it and stops the server. Both ask Claude for a "What we learned" section first (skipped when every step was simply done).
 
 ## Where things are kept
 
 Each flow gets its own folder, `~/.stepflow/<date>-<name>/`:
 
 - `flow.json`: the steps, their statuses, the spin-off conversations and the lessons. Progress survives closing the tab or restarting the computer.
-- `runbook.md`: written when you click Export or Finish.
+- `runbook.md`: written when you click Export or Finish. A copy goes to the runbook library, `~/.claude/stepflow/runbooks/<flow folder>.md`, where later `/stepflow` runs look for it.
 - `context-<step>.md`: what each spin-off was told about the procedure.
 
 ## What the spin-off is allowed to do
 
 The spin-off is a real Claude Code session on your machine (`claude -p`). It runs in the flow's working folder, which is usually your project folder or your home folder.
 
-- It uses your usual Claude Code permission rules, and it can also edit files **without asking** (`acceptEdits` mode).
+- It uses your usual Claude Code permission rules (`dontAsk` mode). Anything they don't already allow, file edits included, is blocked straight away and shown with an **Allow & retry** button.
 - Anything else your rules don't allow, such as a shell command or a web fetch, is blocked. The blocked request is shown under Claude's reply with an **Allow & retry** button.
   - For a shell command, Allow & retry allows that exact command, for that step only.
   - For a tool without a command (writing outside the working folder, web fetches, MCP tools), it allows the whole tool for that step. The page marks these **whole tool**.

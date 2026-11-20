@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { request } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { startServer } from '../scripts/server.mjs';
@@ -21,7 +21,9 @@ beforeEach(async () => {
   process.env.STEPFLOW_CLAUDE = `node ${fake}`;
   process.env.FAKE_LOG = log;
   process.env.FAKE_MODE = 'ok';
+  process.env.CLAUDE_CONFIG_DIR = join(dir, 'claude-config');
   delete process.env.FAKE_DELAY;
+  delete process.env.FAKE_STEP_DELAY;
   server = await startServer(flowPath, { open: false, exitOnFinish: false });
   token = JSON.parse(readFileSync(flowPath, 'utf8')).token;
 });
@@ -100,6 +102,19 @@ test('parallel chats on one step: one 200, one 409', async () => {
   assert.equal(calls(), 1);
 });
 
+test('flow reports the running turn\'s current tool, and clears it after', async () => {
+  process.env.FAKE_STEP_DELAY = '800';
+  const chat = call('POST', '/api/steps/s1/chat', { message: 'x' });
+  await new Promise(r => setTimeout(r, 500));
+  const during = (await call('GET', '/api/flow')).body;
+  assert.deepEqual(during.busy, ['s1']);
+  assert.equal(during.progress.s1.tool, 'Bash');
+  assert.equal(during.progress.s1.detail, 'ls -la');
+  assert.ok(during.progress.s1.since);
+  await chat;
+  assert.deepEqual((await call('GET', '/api/flow')).body.progress, {});
+});
+
 test('claude error is recorded in thread', async () => {
   process.env.FAKE_MODE = 'fail';
   const r = await call('POST', '/api/steps/s1/chat', { message: 'x' });
@@ -127,11 +142,39 @@ test('summarize sets lesson without adding to thread', async () => {
   assert.equal(step.messages.length, 2);
 });
 
-test('export writes runbook next to flow', async () => {
+test('export writes runbook next to flow and into the runbook library', async () => {
+  await call('POST', '/api/steps/s1/status', { status: 'done' });
+  await call('POST', '/api/steps/s2/status', { status: 'done' });
   const r = await call('POST', '/api/export');
   assert.equal(r.status, 200);
   assert.match(readFileSync(join(dirname(flowPath), 'runbook.md'), 'utf8'), /^# T/);
   assert.match(r.body.markdown, /Needed attention/);
+  assert.doesNotMatch(r.body.markdown, /What we learned/); // all done, no help needed: no claude call
+  assert.equal(calls(), 0);
+  assert.equal(r.body.libraryPath, join(process.env.CLAUDE_CONFIG_DIR, 'stepflow', 'runbooks', `${basename(dirname(flowPath))}.md`));
+  assert.equal(readFileSync(r.body.libraryPath, 'utf8'), r.body.markdown);
+});
+
+test('export asks claude for learnings from statuses, lessons and threads', async () => {
+  await call('POST', '/api/steps/s1/chat', { message: 'port 22 timed out' });
+  await call('POST', '/api/steps/s2/status', { status: 'blocked' });
+  const r = await call('POST', '/api/export');
+  assert.equal(r.status, 200);
+  const learn = JSON.parse(readFileSync(log, 'utf8').trim().split('\n').at(-1));
+  assert.ok(learn.args.includes('--session-id'));
+  assert.notEqual(learn.args[learn.args.indexOf('--session-id') + 1], JSON.parse(readFileSync(flowPath, 'utf8')).steps[0].sessionId);
+  assert.match(learn.input, /User: port 22 timed out/);
+  assert.match(learn.input, /Step 2: Two — blocked/);
+  assert.match(r.body.markdown, /## What we learned\n\necho: Procedure: T/);
+});
+
+test('export still saves when the learning summary fails', async () => {
+  await call('POST', '/api/steps/s1/status', { status: 'blocked' });
+  process.env.FAKE_MODE = 'fail';
+  const r = await call('POST', '/api/export');
+  assert.equal(r.status, 200);
+  assert.match(r.body.markdown, /Could not summarize the learnings/);
+  assert.ok(existsSync(r.body.libraryPath));
 });
 
 test('restart reuses saved port', async () => {

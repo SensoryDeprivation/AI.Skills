@@ -11,7 +11,7 @@ process.stdin.on('end', async () => {
   const mode = process.env.FAKE_MODE ?? 'ok';
   if (mode === 'bad') return process.stdout.write('not json');
   if (mode === 'null') return process.stdout.write('null');
-  if (mode === 'baddenials') return process.stdout.write(JSON.stringify({ result: 'x', permission_denials: 'nope' }));
+  if (mode === 'baddenials') return process.stdout.write(JSON.stringify({ type: 'result', result: 'x', permission_denials: 'nope' }));
   if (mode === 'grandchild') {
     // Simulates a tool subprocess that outlives a timeout kill unless the whole tree is killed.
     const { spawn } = await import('node:child_process');
@@ -22,5 +22,8 @@ process.stdin.on('end', async () => {
   const denials = mode === 'deny'
     ? [{ tool_name: 'Bash', tool_use_id: 't1', tool_input: { command: 'curl x' } }]
     : [];
+  // Like stream-json: a tool call event, then the result line.
+  process.stdout.write(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls -la\nsecond line' } }] } }) + '\n');
+  if (process.env.FAKE_STEP_DELAY) await new Promise(r => setTimeout(r, Number(process.env.FAKE_STEP_DELAY)));
   process.stdout.write(JSON.stringify({ type: 'result', is_error: false, result: `echo: ${input}`, session_id: sid, permission_denials: denials }));
 });

@@ -2,7 +2,7 @@
   "name": "stepflow",
   "displayName": "Stepflow",
   "description": "Work through multi-step instructions one step at a time on a local page, troubleshoot any step in its own Claude spin-off, and export a runbook with the lessons learned",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Adam Jaszczurowski",
     "url": "https://github.com/SensoryDeprivation"

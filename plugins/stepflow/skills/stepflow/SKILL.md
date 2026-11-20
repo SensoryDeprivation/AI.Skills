@@ -10,7 +10,9 @@ Scripts live in this skill's `scripts/` directory (`server.mjs`, `flow.mjs`, `cl
 
 1. **`/stepflow <slug or folder>` naming an existing flow** (a folder under `~/.stepflow/` exists): just restart its server (see *Start the server*). Don't read or summarize the flow.
 2. **`/stepflow <path to runbook.md>`**: read the runbook and write a new flow for the same goal with the lessons **folded into the steps**: fix the commands that needed fixing, add the prerequisite steps that were discovered, reword UI steps to match what the user actually saw, drop steps that were skipped as unnecessary. Lessons must not survive as side notes — the new steps should simply work. Then create the flow (below).
-3. **`/stepflow` or `/stepflow <task>`**: use the multi-step instructions already in this conversation, or work out the steps for `<task>`. Then create the flow.
+3. **`/stepflow` or `/stepflow <task>`**: use the multi-step instructions already in this conversation, or work out the steps for `<task>`. First look in the runbook library, `~/.claude/stepflow/runbooks/` (`$CLAUDE_CONFIG_DIR/stepflow/runbooks/` if that is set; one `<flow folder name>.md` per flow): if a runbook there covers the same procedure, treat it as mode 2 and fold its lessons in. Then create the flow.
+
+The library is also worth reading, outside `/stepflow`, whenever the user is about to repeat a procedure that one of its runbooks covers.
 
 ## Create the flow
 
@@ -45,10 +47,11 @@ Start it detached so it outlives this turn; it opens the page in the browser its
 - Windows (PowerShell): `Start-Process node -ArgumentList '"<skill dir>\scripts\server.mjs"', '"<flow folder>\flow.json"' -WindowStyle Hidden`
 - macOS/Linux: `nohup node "<skill dir>/scripts/server.mjs" "<flow folder>/flow.json" >/dev/null 2>&1 &`
 
-Then tell the user, in one or two lines: the page opened, the flow folder name (so they can `/stepflow <name>` later to reopen it), and that **Finish** on the page saves `runbook.md` in that folder for next time. The URL contains a secret token and is saved with the port in `flow.json`, so reopening reuses it; don't print it unless the browser didn't open.
+Then tell the user, in one or two lines: the page opened, the flow folder name (so they can `/stepflow <name>` later to reopen it), and that **Export**/**Finish** on the page has Claude write up what worked, what didn't and what was confusing, saved as `runbook.md` in that folder and in the runbook library for next time. The URL contains a secret token and is saved with the port in `flow.json`, so reopening reuses it; don't print it unless the browser didn't open.
 
 ## How the spin-off behaves (so you can explain it)
 
-- Runs `claude -p --permission-mode acceptEdits` in the flow's `cwd`: the user's allow rules apply and file edits are allowed. Anything else it tries is blocked and shown under its reply with an **Allow & retry** button. For shell tools that allows that exact command for that step only; for tools without a command (e.g. Write outside `cwd`, WebFetch, MCP tools) it allows the whole tool for that step, and the page labels those "whole tool".
+- Runs `claude -p --permission-mode dontAsk` in the flow's `cwd`: the user's allow rules apply. Anything else it tries, file edits included, is blocked at once (no prompt, no PermissionRequest hooks) and shown under its reply with an **Allow & retry** button. For shell tools that allows that exact command for that step only; for tools without a command (e.g. Edit, Write, WebFetch, MCP tools) it allows the whole tool for that step, and the page labels those "whole tool".
+- While it works, the panel shows the elapsed time and the tool it is running.
 - **Summarize fix** turns the spin-off conversation into the step's lesson; the lesson field can also be edited by hand.
 - State (statuses, threads, lessons) is in `flow.json`; nothing is lost by closing the tab or rebooting.

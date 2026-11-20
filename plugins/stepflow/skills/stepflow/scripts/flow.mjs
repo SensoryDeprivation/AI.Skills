@@ -91,7 +91,35 @@ export function statusLine(flow) {
   return 'Statuses now: ' + flow.steps.map((s, i) => `${i + 1} ${s.status}`).join(', ');
 }
 
-export function renderRunbook(flow) {
+export const LEARN_PROMPT = [
+  'You are given the record of a finished (or abandoned) multi-step procedure: each step with its status, its lesson, and the troubleshooting chat the user had about it.',
+  'Write what should be learned from this run, so the next run of the same procedure goes smoothly. Use exactly these markdown sections, as bullet lists, and name the step number in each bullet:',
+  '### What worked', '### What did not work (and the fix, if one was found)', '### What was confusing or unclear', '### Change for next time',
+  'Only use facts from the record; write "- Nothing noted." under a section with nothing to say. Do not run tools. Reply with only the markdown.',
+].join('\n\n');
+
+const clip = (text, max = 3000) => (text.length > max ? `${text.slice(0, max)}…` : text);
+
+// The run as plain text for the learning summary.
+export function learningInput(flow) {
+  const parts = [`Procedure: ${flow.title ?? ''}`, `Goal: ${flow.goal ?? ''}`];
+  if (flow.context) parts.push(`Context: ${flow.context}`);
+  flow.steps.forEach((s, i) => {
+    parts.push(`## Step ${i + 1}: ${s.title} — ${s.status}`, s.body ?? '');
+    if (s.expected) parts.push(`Expected: ${s.expected}`);
+    if (s.lesson) parts.push(`Lesson: ${s.lesson}`);
+    for (const m of s.messages) {
+      const extra = [m.error && `(error: ${m.error})`, ...(m.denials ?? []).map(d => `(blocked: ${d.rule})`)].filter(Boolean).join(' ');
+      parts.push(`${m.role === 'user' ? 'User' : 'Claude'}: ${clip(m.text ?? '')}${extra ? ' ' + extra : ''}`);
+    }
+  });
+  return parts.join('\n\n');
+}
+
+// Nothing to learn when every step was done as written and nobody needed help.
+export const hasLearnings = flow => flow.steps.some(s => s.status !== 'done' || s.lesson || s.messages.length);
+
+export function renderRunbook(flow, learned) {
   const parts = [`# ${flow.title ?? 'Stepflow'}`, `**Goal:** ${flow.goal ?? ''}`];
   if (flow.context) parts.push(`**Context:** ${flow.context}`);
   flow.steps.forEach((s, i) => {
@@ -106,5 +134,6 @@ export function renderRunbook(flow) {
   parts.push(attention.length
     ? attention.map(({ s, n }) => `- Step ${n} (${s.title}) — ${s.status}${s.lesson ? `: ${s.lesson}` : ''}`).join('\n')
     : '- Nothing; every step worked as written.');
+  if (learned) parts.push('## What we learned', learned.trim());
   return parts.join('\n\n') + '\n';
 }

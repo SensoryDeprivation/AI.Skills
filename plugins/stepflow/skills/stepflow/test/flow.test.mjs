@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { normalize, loadFlow, createStore, contextPrompt, statusLine, renderRunbook } from '../scripts/flow.mjs';
+import { normalize, loadFlow, createStore, contextPrompt, statusLine, renderRunbook, learningInput, hasLearnings } from '../scripts/flow.mjs';
 
 const sample = () => ({
   title: 'Install X',
@@ -135,4 +135,21 @@ test('expected result goes into context prompt and runbook', () => {
   normalize(flow);
   assert.match(contextPrompt(flow, 's2'), /Expected result:\n\nDemo toggle shows \*\*On\*\*/);
   assert.match(renderRunbook(flow), /## 2\. Configure — pending\n\nEdit config\n\n\*\*Expected:\*\* Demo toggle shows \*\*On\*\*/);
+});
+
+test('learningInput includes statuses, lessons, threads and denials; hasLearnings', () => {
+  const flow = sample();
+  normalize(flow);
+  flow.steps.forEach(s => (s.status = 'done'));
+  assert.equal(hasLearnings(flow), false);
+  flow.steps[1].status = 'blocked';
+  flow.steps[1].lesson = 'Config is in %APPDATA%';
+  flow.steps[1].messages.push({ role: 'user', text: 'where is the config?' }, { role: 'assistant', text: 'Look in AppData', denials: [{ rule: 'Bash(dir)' }] });
+  assert.equal(hasLearnings(flow), true);
+  const input = learningInput(flow);
+  assert.match(input, /## Step 2: Configure — blocked/);
+  assert.match(input, /Lesson: Config is in %APPDATA%/);
+  assert.match(input, /User: where is the config\?/);
+  assert.match(input, /Claude: Look in AppData \(blocked: Bash\(dir\)\)/);
+  assert.match(renderRunbook(flow, '### What worked\n- Step 1'), /## What we learned\n\n### What worked\n- Step 1\n$/);
 });

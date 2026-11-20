@@ -106,7 +106,7 @@
 </dialog>
 <script>
 const token = new URLSearchParams(location.search).get('t') || '';
-const state = { flow: null, expanded: null, panel: null, drafts: {}, working: new Set(), finished: false, error: '' };
+const state = { flow: null, expanded: null, panel: null, drafts: {}, working: new Set(), started: {}, exporting: false, finished: false, error: '' };
 const $ = id => document.getElementById(id);
 
 async function api(method, path, body) {
@@ -169,7 +169,8 @@ function render() {
     <p class="progress">${counts.done || 0} done · ${counts.blocked || 0} blocked · ${counts.skipped || 0} skipped · ${counts.pending || 0} to go</p>
     ${f.steps.map((s, i) => stepHtml(s, i)).join('')}`;
   renderSide();
-  $('status').textContent = state.working.size ? 'Claude is working…' : '';
+  $('status').textContent = state.exporting ? 'Claude is writing up what was learned…' : state.working.size ? 'Claude is working…' : '';
+  $('export').disabled = $('finish').disabled = state.exporting || !!state.finished;
   if (focused) { const el = document.querySelector(`[data-focus-key="${focused}"]`); if (el) { el.focus(); el.setSelectionRange?.(el.value.length, el.value.length); } }
   document.querySelectorAll('.thread').forEach(t => (t.scrollTop = t.scrollHeight));
 }
@@ -189,12 +190,33 @@ function renderSide() {
     </div>
     <div class="thread">
       ${s.messages.length ? s.messages.map(msgHtml(s)).join('') : '<p class="empty">Ask Claude about this step. It knows the goal, every step and their statuses, and can run commands to diagnose.</p>'}
-      ${working ? '<p class="working">Claude is working… (it may be running commands)</p>' : ''}
+      ${working ? `<p class="working" id="working">${workingText(s.id)}</p>` : ''}
     </div>
     <div class="compose">
       <textarea rows="3" data-focus-key="in-${esc(s.id)}" data-input="${esc(s.id)}" placeholder="Describe what happened, paste the error…" ${working || state.finished ? 'disabled' : ''}>${esc(state.drafts[s.id] || '')}</textarea>
       <p class="hint">Enter to send · Shift+Enter for a new line · Esc to close</p>
     </div>`;
+}
+
+// "Claude is working… 1m 05s · Bash: ls -la". The server reports the current tool; the page ticks the clock.
+function workingText(id) {
+  const p = state.flow.progress?.[id] || {};
+  const secs = Math.max(0, Math.round((Date.now() - (state.started[id] ?? Date.now())) / 1000));
+  const clock = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${String(secs % 60).padStart(2, '0')}s`;
+  return `Claude is working… ${clock}${p.tool ? ` · ${esc(p.tool)}${p.detail ? ': <code>' + esc(p.detail) + '</code>' : ''}` : ''}`;
+}
+let ticker = null;
+function tick() {
+  if (!state.working.size) { clearInterval(ticker); ticker = null; return; }
+  api('GET', '/api/flow').then(f => { state.flow.progress = f.progress; }).catch(() => {});
+  const el = $('working');
+  if (el && state.panel) el.innerHTML = workingText(state.panel);
+}
+function startWorking(id) {
+  state.working.add(id);
+  state.started[id] = Date.now();
+  if (state.flow.progress) delete state.flow.progress[id];
+  ticker ??= setInterval(tick, 1000);
 }
 
 function openPanel(id) {
@@ -256,13 +278,16 @@ async function guarded(fn) {
 async function setStatus(id, status) {
   await guarded(async () => {
     state.flow = await api('POST', `/api/steps/${id}/status`, { status });
-    if (status === 'done' || status === 'skipped') state.expanded = nextOpenAfter(id);
+    if (status === 'done' || status === 'skipped') {
+      state.expanded = nextOpenAfter(id);
+      if (state.panel === id) state.panel = null; // moving on: don't leave the previous step's spin-off open
+    }
     if (status === 'blocked') setTimeout(() => openPanel(id));
   });
 }
 
 async function converse(id, path, body, optimistic) {
-  state.working.add(id);
+  startWorking(id);
   if (optimistic) step(id).messages.push({ role: 'user', text: optimistic });
   render();
   try {
@@ -305,7 +330,7 @@ document.addEventListener('click', async e => {
   if (act === 'close-panel') { state.panel = null; render(); }
   if (act === 'allow') converse(id, `/api/steps/${id}/allow`, { rule: b.dataset.rule });
   if (act === 'summarize') {
-    state.working.add(id); render();
+    startWorking(id); render();
     await guarded(async () => { const { lesson } = await api('POST', `/api/steps/${id}/summarize`); step(id).lesson = lesson; });
     state.working.delete(id); render();
   }
@@ -331,14 +356,19 @@ function showRunbook(title) {
   $('dlgBody').textContent = runbook.markdown;
   $('dlg').showModal();
 }
-$('export').onclick = () => guarded(async () => { runbook = await api('POST', '/api/export'); showRunbook(`Runbook — saved to ${runbook.path}`); });
+async function exportTo(path) {
+  state.exporting = true;
+  render();
+  try { runbook = await api('POST', path); } finally { state.exporting = false; }
+}
+const savedTitle = () => `Runbook — saved to ${runbook.path} and ${runbook.libraryPath}`;
+$('export').onclick = () => guarded(async () => { await exportTo('/api/export'); showRunbook(savedTitle()); });
 $('finish').onclick = () => {
-  if (!confirm('Finish this stepflow? The runbook is saved and the local server stops.')) return;
+  if (!confirm('Finish this stepflow? Claude writes up what was learned, the runbook is saved and the local server stops.')) return;
   guarded(async () => {
-    runbook = await api('POST', '/api/finish');
+    await exportTo('/api/finish');
     state.finished = runbook.path;
-    $('export').disabled = $('finish').disabled = true;
-    showRunbook(`Runbook — saved to ${runbook.path}`);
+    showRunbook(savedTitle());
   });
 };
 $('dlgClose').onclick = () => $('dlg').close();
